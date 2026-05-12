@@ -1,2 +1,7 @@
 __pycache__/
 *.py[cod]
+docs/output.html
+docs/output.pdf
+docs/ir.json
+docs/ast.mmd
+docs/ast.dot
