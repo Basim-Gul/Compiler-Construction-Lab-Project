@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+import threading
 from dataclasses import dataclass, field
 
 import ply.yacc as yacc
@@ -16,12 +18,18 @@ class ParserState:
     errors: list[str] = field(default_factory=list)
 
 
-_parser_state: ParserState | None = None
+_parser_state_local = threading.local()
+
+
+def _get_parser_state() -> ParserState | None:
+    return getattr(_parser_state_local, "state", None)
 
 
 def p_module(p):
     "module : elements"
-    p[0] = ModuleNode(name=_parser_state.module_name, functions=p[1])
+    parser_state = _get_parser_state()
+    module_name = parser_state.module_name if parser_state else "module"
+    p[0] = ModuleNode(name=module_name, functions=p[1])
 
 
 def p_elements_recursive(p):
@@ -139,17 +147,16 @@ def p_empty(p):
 
 
 def p_error(p):
-    if p is not None and _parser_state is not None:
-        _parser_state.errors.append(f"Syntax issue near token {p.type} ({p.value!r})")
-
-
-_parser = yacc.yacc(start="module", write_tables=False, debug=False)
+    parser_state = _get_parser_state()
+    if p is not None and parser_state is not None:
+        parser_state.errors.append(f"Syntax issue near token {p.type} ({p.value!r})")
 
 
 def parse_source(source_code: str, module_name: str = "module") -> tuple[ModuleNode, list[str]]:
-    global _parser_state
-    _parser_state = ParserState(module_name=module_name)
+    _parser_state_local.state = ParserState(module_name=module_name)
     lexer = build_lexer()
-    module = _parser.parse(source_code, lexer=lexer)
-    errors = list(lexer.errors) + _parser_state.errors
+    parser = yacc.yacc(module=sys.modules[__name__], start="module", write_tables=False, debug=False)
+    module = parser.parse(source_code, lexer=lexer)
+    parser_state = _get_parser_state()
+    errors = list(lexer.errors) + (parser_state.errors if parser_state else [])
     return module or ModuleNode(name=module_name), errors

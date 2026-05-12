@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
-
 import ply.lex as lex
 
 
@@ -81,7 +79,11 @@ t_ignore = " \t\r\f\v"
 
 
 def t_error(t):
-    t.lexer.errors.append(f"Invalid character {t.value[0]!r} at line {t.lineno}")
+    line_start = t.lexer.lexdata.rfind("\n", 0, t.lexpos) + 1
+    column = t.lexpos - line_start + 1
+    t.lexer.errors.append(
+        f"Invalid character {t.value[0]!r} at line {t.lineno}, column {column}"
+    )
     t.lexer.skip(1)
 
 
@@ -91,10 +93,10 @@ def build_lexer(**kwargs):
     return lexer
 
 
-def tokenize(source_code: str) -> Tuple[List[lex.LexToken], List[str]]:
+def tokenize(source_code: str) -> tuple[list[lex.LexToken], list[str]]:
     lexer = build_lexer()
     lexer.input(source_code)
-    token_stream: List[lex.LexToken] = []
+    token_stream: list[lex.LexToken] = []
     while True:
         token = lexer.token()
         if not token:

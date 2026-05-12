@@ -7,19 +7,22 @@ from pathlib import Path
 from fpdf import FPDF
 
 
-def _sanitize_text(value: str, chunk_size: int = 70) -> str:
+def _prepare_text_for_pdf(value: str, chunk_size: int = 70) -> str:
     chunks: list[str] = []
-    for word in value.replace("\n", " ").split(" "):
+    for word in value.split():
         if len(word) <= chunk_size:
             chunks.append(word)
             continue
-        chunks.extend(word[index : index + chunk_size] for index in range(0, len(word), chunk_size))
+        chunks.extend(
+            word[chunk_start : chunk_start + chunk_size]
+            for chunk_start in range(0, len(word), chunk_size)
+        )
     return " ".join(part for part in chunks if part)
 
 
 def _write_line(pdf: FPDF, text: str, height: int = 6) -> None:
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(0, height, _sanitize_text(text))
+    pdf.multi_cell(0, height, _prepare_text_for_pdf(text))
 
 
 def generate_pdf(ir: dict, output_path: Path) -> None:
@@ -54,5 +57,16 @@ def generate_pdf(ir: dict, output_path: Path) -> None:
             _write_line(pdf, f"- {warning}")
     else:
         _write_line(pdf, "No semantic warnings.")
+
+    parser_errors = ir.get("parser_errors", [])
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.multi_cell(0, 8, "Parser Errors")
+    pdf.set_font("Helvetica", size=11)
+    if parser_errors:
+        for parser_error in parser_errors:
+            _write_line(pdf, f"- {parser_error}")
+    else:
+        _write_line(pdf, "No parser errors.")
 
     pdf.output(str(output_path))

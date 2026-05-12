@@ -35,6 +35,14 @@ _TEMPLATE = Template(
       <p>No semantic warnings.</p>
     {% endif %}
   </div>
+  <div class="card">
+    <h2>Parser Errors</h2>
+    {% if ir.parser_errors %}
+      <ul>{% for error in ir.parser_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+    {% else %}
+      <p>No parser errors.</p>
+    {% endif %}
+  </div>
 
   {% for module in ir.modules %}
   <div class="card">

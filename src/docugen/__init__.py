@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from docugen.generators import generate_html as render_html
 from docugen.generators import generate_pdf as render_pdf
@@ -9,18 +10,18 @@ from docugen.ir_generator import build_ir
 from docugen.parser import parse_source
 from docugen.semantic_analyzer import analyze_semantics
 from docugen.symbol_table import SymbolTable
-from docugen.visualization import build_mermaid_ast
+from docugen.visualization import build_graphviz_ast, build_mermaid_ast
 
 
 
 def analyze_project(
-    project_path,
-    output_dir,
-    generate_html=True,
-    generate_pdf=True,
-    generate_ast=True,
-    generate_ir=True,
-):
+    project_path: str,
+    output_dir: str,
+    generate_html: bool = True,
+    generate_pdf: bool = True,
+    generate_ast: bool = True,
+    generate_ir: bool = True,
+) -> dict[str, Any]:
     """Run DocuGen compiler pipeline: Lex -> Parse -> AST -> IR -> HTML/PDF."""
     project_root = Path(project_path)
     output_root = Path(output_dir)
@@ -50,7 +51,12 @@ def analyze_project(
         )
         symbol_table.build_from_module(module)
 
-    ir = build_ir(modules, semantic_warnings + parser_errors, symbol_table.to_dict())
+    ir = build_ir(
+        modules=modules,
+        semantic_warnings=semantic_warnings,
+        parser_errors=parser_errors,
+        symbol_table=symbol_table.to_dict(),
+    )
 
     mermaid_graph = build_mermaid_ast(modules) if generate_ast else ""
     outputs: dict[str, str] = {}
@@ -58,7 +64,10 @@ def analyze_project(
     if generate_ast:
         ast_path = output_root / "ast.mmd"
         ast_path.write_text(mermaid_graph, encoding="utf-8")
+        graphviz_dot_path = output_root / "ast.dot"
+        graphviz_dot_path.write_text(build_graphviz_ast(modules), encoding="utf-8")
         outputs["ast"] = str(ast_path)
+        outputs["ast_dot"] = str(graphviz_dot_path)
 
     if generate_ir:
         ir_path = output_root / "ir.json"
