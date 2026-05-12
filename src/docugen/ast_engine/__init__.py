@@ -1,3 +1,3 @@
-from .nodes import DocstringNode, FunctionNode, ModuleNode, ParameterNode
+from .nodes import ClassNode, DocstringNode, FunctionNode, ModuleNode, ParameterNode
 
-__all__ = ["ModuleNode", "FunctionNode", "ParameterNode", "DocstringNode"]
+__all__ = ["ModuleNode", "ClassNode", "FunctionNode", "ParameterNode", "DocstringNode"]

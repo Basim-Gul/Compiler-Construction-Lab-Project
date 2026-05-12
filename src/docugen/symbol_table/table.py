@@ -25,6 +25,15 @@ class SymbolTable:
             for parameter in function.parameters:
                 scope.symbols[parameter.name] = parameter.annotation or "unknown"
             self.function_scopes[function.name] = scope
+        for klass in module.classes:
+            self.global_scope.symbols[klass.name] = "class"
+            for method in klass.methods:
+                scoped_name = f"{klass.name}.{method.name}"
+                self.global_scope.symbols[scoped_name] = "method"
+                scope = Scope(name=scoped_name)
+                for parameter in method.parameters:
+                    scope.symbols[parameter.name] = parameter.annotation or "unknown"
+                self.function_scopes[scoped_name] = scope
 
     def to_dict(self) -> dict[str, dict[str, dict[str, str]]]:
         return {

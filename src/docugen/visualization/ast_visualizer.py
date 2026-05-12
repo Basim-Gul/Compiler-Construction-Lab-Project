@@ -38,6 +38,21 @@ def build_mermaid_ast(modules: list[ModuleNode]) -> str:
                     f"{parameter_id}[\"Param: {parameter.name} ({annotation})\"]"
                 )
                 lines.append(f"{function_id} --> {parameter_id}")
+        for class_index, klass in enumerate(module.classes):
+            class_id = f"{module_id}_C{class_index}"
+            lines.append(f"{class_id}[\"Class: {klass.name}\"]")
+            lines.append(f"{module_id} --> {class_id}")
+            for method_index, method in enumerate(klass.methods):
+                method_id = f"{class_id}_M{method_index}"
+                lines.append(f"{method_id}[\"Method: {method.name}\"]")
+                lines.append(f"{class_id} --> {method_id}")
+                for parameter_index, parameter in enumerate(method.parameters):
+                    parameter_id = f"{method_id}_P{parameter_index}"
+                    annotation = parameter.annotation or "untyped"
+                    lines.append(
+                        f"{parameter_id}[\"Param: {parameter.name} ({annotation})\"]"
+                    )
+                    lines.append(f"{method_id} --> {parameter_id}")
     return "\n".join(lines)
 
 
@@ -64,4 +79,17 @@ def build_graphviz_ast(modules: list[ModuleNode]) -> str:
                 annotation = parameter.annotation or "untyped"
                 graph.node(parameter_id, f"{parameter.name}: {annotation}")
                 graph.edge(function_id, parameter_id)
+        for class_index, klass in enumerate(module.classes):
+            class_id = f"{module_id}_C{class_index}"
+            graph.node(class_id, f"Class: {klass.name}", shape="box3d")
+            graph.edge(module_id, class_id)
+            for method_index, method in enumerate(klass.methods):
+                method_id = f"{class_id}_M{method_index}"
+                graph.node(method_id, f"Method: {method.name}", shape="ellipse")
+                graph.edge(class_id, method_id)
+                for parameter_index, parameter in enumerate(method.parameters):
+                    parameter_id = f"{method_id}_P{parameter_index}"
+                    annotation = parameter.annotation or "untyped"
+                    graph.node(parameter_id, f"{parameter.name}: {annotation}")
+                    graph.edge(method_id, parameter_id)
     return graph.source
