@@ -6,12 +6,25 @@ import ply.lex as lex
 
 
 tokens = (
+    "CLASS",
     "DEF",
     "IDENTIFIER",
+    "NUMBER",
+    "LBRACKET",
+    "RBRACKET",
+    "LBRACE",
+    "RBRACE",
     "LPAREN",
     "RPAREN",
+    "DOT",
     "COLON",
     "COMMA",
+    "ASSIGN",
+    "PLUS",
+    "MINUS",
+    "STAR",
+    "SLASH",
+    "AT",
     "ARROW",
     "DOCSTRING",
     "STRING",
@@ -20,8 +33,68 @@ tokens = (
 )
 
 
+def t_CLASS(t):
+    r"class\b"
+    return t
+
+
 def t_ARROW(t):
     r"->"
+    return t
+
+
+def t_DOT(t):
+    r"\."
+    return t
+
+
+def t_ASSIGN(t):
+    r"="
+    return t
+
+
+def t_PLUS(t):
+    r"\+"
+    return t
+
+
+def t_MINUS(t):
+    r"-"
+    return t
+
+
+def t_STAR(t):
+    r"\*"
+    return t
+
+
+def t_SLASH(t):
+    r"/"
+    return t
+
+
+def t_AT(t):
+    r"@"
+    return t
+
+
+def t_LBRACKET(t):
+    r"\["
+    return t
+
+
+def t_RBRACKET(t):
+    r"\]"
+    return t
+
+
+def t_LBRACE(t):
+    r"\{"
+    return t
+
+
+def t_RBRACE(t):
+    r"\}"
     return t
 
 
@@ -55,6 +128,11 @@ def t_IDENTIFIER(t):
     return t
 
 
+def t_NUMBER(t):
+    r"((\d+\.\d*|\.\d+|\d+)([eE][+-]?\d+)?|\d+)"
+    return t
+
+
 def t_DOCSTRING(t):
     r'("""(.|\n)*?"""|\'\'\'(.|\n)*?\'\'\')'
     t.lexer.lineno += t.value.count("\n")
@@ -72,7 +150,7 @@ def t_NEWLINE(t):
     return t
 
 
-t_OTHER = r"[@\[\]{}=+\-*/%&|^~<>.!?;#]+"
+t_OTHER = r"[%&|^~<>!?;#]+"
 
 
 t_ignore = " \t\r\f\v"

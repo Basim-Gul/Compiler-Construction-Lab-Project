@@ -1,162 +1,80 @@
-"""PLY parser for extracting basic Python function signatures and docstrings."""
+"""Parser for extracting Python modules, classes, methods and functions."""
 
 from __future__ import annotations
 
-import sys
-import threading
-from dataclasses import dataclass, field
+import ast
 
-import ply.yacc as yacc
-
-from docugen.ast_engine import DocstringNode, FunctionNode, ModuleNode, ParameterNode
-from docugen.lexer.lexer import build_lexer, tokens
+from docugen.ast_engine import ClassNode, DocstringNode, FunctionNode, ModuleNode, ParameterNode
 
 
-@dataclass
-class ParserState:
-    module_name: str
-    errors: list[str] = field(default_factory=list)
+def _stringify(node: ast.AST | None) -> str | None:
+    if node is None:
+        return None
+    try:
+        return ast.unparse(node)
+    except Exception:
+        return None
 
 
-_parser_state_local = threading.local()
+def _build_parameters(function: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ParameterNode]:
+    args: list[ast.arg] = [
+        *function.args.posonlyargs,
+        *function.args.args,
+        *function.args.kwonlyargs,
+    ]
+    if function.args.vararg is not None:
+        args.append(function.args.vararg)
+    if function.args.kwarg is not None:
+        args.append(function.args.kwarg)
+    return [
+        ParameterNode(name=argument.arg, annotation=_stringify(argument.annotation))
+        for argument in args
+    ]
 
 
-def _get_parser_state() -> ParserState | None:
-    return getattr(_parser_state_local, "state", None)
+def _build_docstring(node: ast.AST) -> DocstringNode | None:
+    text = ast.get_docstring(node, clean=False)
+    return DocstringNode(value=text) if text else None
 
 
-def p_module(p):
-    "module : elements"
-    parser_state = _get_parser_state()
-    module_name = parser_state.module_name if parser_state else "module"
-    p[0] = ModuleNode(name=module_name, functions=p[1])
-
-
-def p_elements_recursive(p):
-    "elements : elements element"
-    if p[2] is None:
-        p[0] = p[1]
-    elif isinstance(p[2], FunctionNode):
-        p[0] = p[1] + [p[2]]
-    else:
-        p[0] = p[1]
-
-
-def p_elements_empty(p):
-    "elements : empty"
-    p[0] = []
-
-
-def p_element_function(p):
-    "element : function_def"
-    p[0] = p[1]
-
-
-def p_element_junk(p):
-    "element : junk"
-    p[0] = None
-
-
-def p_function_def(p):
-    "function_def : DEF IDENTIFIER LPAREN parameter_list RPAREN return_annotation_opt COLON function_body"
-    p[0] = FunctionNode(
-        name=p[2],
-        parameters=p[4],
-        returns=p[6],
-        docstring=p[8],
+def _build_function(function: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionNode:
+    return FunctionNode(
+        name=function.name,
+        parameters=_build_parameters(function),
+        returns=_stringify(function.returns),
+        docstring=_build_docstring(function),
+        decorators=[_stringify(decorator) or "" for decorator in function.decorator_list if _stringify(decorator)],
     )
 
 
-def p_parameter_list_empty(p):
-    "parameter_list : empty"
-    p[0] = []
-
-
-def p_parameter_list_items(p):
-    "parameter_list : parameter_items"
-    p[0] = p[1]
-
-
-def p_parameter_items_single(p):
-    "parameter_items : parameter"
-    p[0] = [p[1]]
-
-
-def p_parameter_items_multi(p):
-    "parameter_items : parameter_items COMMA parameter"
-    p[0] = p[1] + [p[3]]
-
-
-def p_parameter(p):
-    "parameter : IDENTIFIER annotation_opt"
-    p[0] = ParameterNode(name=p[1], annotation=p[2])
-
-
-def p_annotation_opt(p):
-    """annotation_opt : COLON IDENTIFIER
-    | empty"""
-    p[0] = p[2] if len(p) == 3 else None
-
-
-def p_return_annotation_opt(p):
-    """return_annotation_opt : ARROW IDENTIFIER
-    | empty"""
-    p[0] = p[2] if len(p) == 3 else None
-
-
-def p_function_body(p):
-    "function_body : skip_newlines docstring_opt"
-    p[0] = p[2]
-
-
-def p_skip_newlines_more(p):
-    "skip_newlines : skip_newlines NEWLINE"
-
-
-def p_skip_newlines_empty(p):
-    "skip_newlines : empty"
-
-
-def p_docstring_opt(p):
-    """docstring_opt : DOCSTRING
-    | STRING
-    | empty"""
-    if len(p) == 2 and isinstance(p[1], str):
-        cleaned = p[1].strip('"\'')
-        p[0] = DocstringNode(value=cleaned)
-    else:
-        p[0] = None
-
-
-def p_junk(p):
-    """junk : IDENTIFIER
-    | LPAREN
-    | RPAREN
-    | COLON
-    | COMMA
-    | ARROW
-    | DOCSTRING
-    | STRING
-    | NEWLINE
-    | OTHER
-    | DEF"""
-
-
-def p_empty(p):
-    "empty :"
-
-
-def p_error(p):
-    parser_state = _get_parser_state()
-    if p is not None and parser_state is not None:
-        parser_state.errors.append(f"Syntax issue near token {p.type} ({p.value!r})")
+def _build_class(klass: ast.ClassDef) -> ClassNode:
+    methods = [
+        _build_function(node)
+        for node in klass.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    return ClassNode(
+        name=klass.name,
+        bases=[_stringify(base) or "" for base in klass.bases if _stringify(base)],
+        methods=methods,
+        docstring=_build_docstring(klass),
+        decorators=[_stringify(decorator) or "" for decorator in klass.decorator_list if _stringify(decorator)],
+    )
 
 
 def parse_source(source_code: str, module_name: str = "module") -> tuple[ModuleNode, list[str]]:
-    _parser_state_local.state = ParserState(module_name=module_name)
-    lexer = build_lexer()
-    parser = yacc.yacc(module=sys.modules[__name__], start="module", write_tables=False, debug=False)
-    module = parser.parse(source_code, lexer=lexer)
-    parser_state = _get_parser_state()
-    errors = list(lexer.errors) + (parser_state.errors if parser_state else [])
-    return module or ModuleNode(name=module_name), errors
+    try:
+        root = ast.parse(source_code)
+    except SyntaxError as exc:
+        message = f"Syntax issue at line {exc.lineno}, column {exc.offset}: {exc.msg}"
+        return ModuleNode(name=module_name), [message]
+
+    functions: list[FunctionNode] = []
+    classes: list[ClassNode] = []
+    for node in root.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            functions.append(_build_function(node))
+        elif isinstance(node, ast.ClassDef):
+            classes.append(_build_class(node))
+
+    return ModuleNode(name=module_name, functions=functions, classes=classes), []
