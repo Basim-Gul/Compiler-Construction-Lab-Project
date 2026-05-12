@@ -21,7 +21,7 @@ def main() -> int:
 
     source_path = Path(args.path)
     if not source_path.exists():
-        print(f"File not found: {source_path}")
+        print(f"File not found: {source_path}", file=sys.stderr)
         return 1
 
     source_code = source_path.read_text(encoding="utf-8")

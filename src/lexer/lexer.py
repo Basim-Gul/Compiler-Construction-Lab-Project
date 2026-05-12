@@ -8,6 +8,11 @@ from typing import List, Tuple
 import ply.lex as lex
 
 KEYWORDS = set(keyword.kwlist)
+OPERATOR_PATTERN = (
+    r"\*\*=|//=|<<=|>>=|==|!=|<=|>=|"  # assignment/comparison operators
+    r"\+=|-=|\*=|/=|%=|\*\*|//|<<|>>|:=|->|"  # augmented/special operators
+    r"[+\-*/%&|^~<>.=]"  # single-character operators
+)
 
 
 tokens = [
@@ -65,8 +70,10 @@ def t_IDENTIFIER(t):
 
 
 def t_OPERATOR(t):
-    r'\*\*=|//=|<<=|>>=|==|!=|<=|>=|\+=|-=|\*=|/=|%=|\*\*|//|<<|>>|:=|->|[+\-*/%&|^~<>.=]'
     return _with_column(t)
+
+
+t_OPERATOR.__doc__ = OPERATOR_PATTERN
 
 
 def t_DELIMITER(t):
@@ -92,6 +99,14 @@ def t_error(t):
 
 
 def build_lexer(**kwargs):
+    """Build and initialize a PLY lexer instance.
+
+    Args:
+        **kwargs: Optional arguments forwarded to ``ply.lex.lex``.
+
+    Returns:
+        A lexer instance with custom ``line_start`` and ``errors`` attributes.
+    """
     lexer = lex.lex(**kwargs)
     lexer.line_start = 0
     lexer.errors = []
@@ -99,6 +114,16 @@ def build_lexer(**kwargs):
 
 
 def tokenize(source_code: str) -> Tuple[List[lex.LexToken], List[str]]:
+    """Tokenize Python source code and collect lexical errors.
+
+    Args:
+        source_code: Raw Python source code as a string.
+
+    Returns:
+        A tuple containing:
+        - A list of ``LexToken`` instances.
+        - A list of lexical error messages.
+    """
     lexer = build_lexer()
     lexer.input(source_code)
     token_stream: List[lex.LexToken] = []
