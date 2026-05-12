@@ -17,3 +17,40 @@ The scope of this project spans the full compiler construction pipeline applied 
 7. Documentation Output Generation
 
 *Initialized via GitHub Copilot.*
+
+## Project Structure
+
+```text
+src/
+├── ast/
+├── generator/
+├── lexer/
+│   └── lexer.py
+├── parser/
+├── semantic/
+└── main.py
+tests/
+└── sample.py
+```
+
+## Setup
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Run the Basic Lexer
+
+Run the lexer against the provided sample file:
+
+```bash
+python src/main.py
+```
+
+Or provide a custom Python file:
+
+```bash
+python src/main.py path/to/file.py
+```
